@@ -1,8 +1,9 @@
-from dealer import Dealer
-from player import Player
-from deck import Deck
 from sys import exit
 from time import sleep
+
+from dealer import Dealer
+from player import Player
+from blackjack.deck import Deck
 
 
 class Engine(object):
