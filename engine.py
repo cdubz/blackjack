@@ -4,6 +4,7 @@ from deck import Deck
 from sys import exit
 from time import sleep
 
+
 class Engine(object):
 
     def __init__(self, dealer_name, player_name):
@@ -19,12 +20,16 @@ class Engine(object):
 
         self.update_scores(deal_to)
 
+    # noinspection PyMethodMayBeStatic
     def update_scores(self, player):
         player.shown_score = 0
         player.total_score = 0
         high_ace_indexes = []
 
         for idx, card in enumerate(player.hand):
+
+            # Track the aces with a value of 11 so they can be evaluated for
+            # a potential decrease to 1 in the next block.
             if card.name == 'A' and card.value == 11:
                 high_ace_indexes.append(idx)
 
@@ -33,26 +38,23 @@ class Engine(object):
 
             player.total_score += card.value
 
-        # If the score exceeds 21, check for 11 aces and adjust
+        # Because aces can be 11 or 1, we must evaluate and optimize their value
+        # if the player has exceeded 21.
         for idx in high_ace_indexes:
             if player.total_score > 21:
                 player.hand[idx].value = 1
                 player.total_score -= 10
 
-                # Check if the ace is part of the shown score and update
-                # there too if necessary.
                 if player.hand[idx].shown:
                     player.shown_score -= 10
 
     def play(self):
-        # Deal first cards
         self.deck.shuffle()
         self.deal_from_top(self.player, False)
         self.deal_from_top(self.dealer, False)
         self.deal_from_top(self.player)
         self.deal_from_top(self.dealer)
 
-        # Deal to player
         while not self.player.stand:
             self.print_status()
             action = raw_input('hit or stand? > ')
@@ -60,18 +62,24 @@ class Engine(object):
             if action == 'hit':
                 self.deal_from_top(self.player)
 
-                # Check for bust
+                # If the player exceeds 21 in shown_score, there is no reason
+                # to continue the game, so this is checked after each hit.
                 if self.player.shown_score > 21:
                     self.end_game()
 
             elif action == 'stand':
                 self.player.stand = True
 
-        # Deal to dealer
         while not self.dealer.stand:
             self.print_status()
+
+            # Add a small delay so that all the status prints do not overwhelm
+            # the player.
             sleep(2)
 
+            # This simple logic does not take in to account any probability.
+            # The total_score of 19 is just a basic safety and the dealer
+            # will take (potentially stupid) risks to beat the player.
             if self.dealer.shown_score > 21:
                 self.end_game()
             elif self.dealer.total_score > 19:
@@ -85,8 +93,8 @@ class Engine(object):
 
     def end_game(self):
         print 'Game over.'
-        print "%s's score: %i" %(self.dealer.name, self.dealer.total_score)
-        print "%s's score: %i" %(self.player.name, self.player.total_score)
+        print "%s's score: %i" % (self.dealer.name, self.dealer.total_score)
+        print "%s's score: %i" % (self.player.name, self.player.total_score)
 
         if self.player.total_score >= 21:
             print 'YOU BUSTED!'
@@ -100,6 +108,8 @@ class Engine(object):
         response = raw_input('yes or no? > ')
 
         if response == 'yes':
+
+            # Re-run init to clear scores and create a new Deck.
             self.__init__(self.dealer.name, self.player.name)
             self.play()
         else:
