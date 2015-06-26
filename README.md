@@ -1,6 +1,6 @@
-# Blackjack
+# Blackjack (gae-web branch)
 
-Blackjack is a simple CLI blackjack game.
+Blackjack on the Google App Engine with a web-based interface.
 
 ## License
 
