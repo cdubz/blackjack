@@ -1,0 +1,13 @@
+application: blackjack
+version: alpha-001
+runtime: python27
+api_version: 1
+threadsafe: true
+
+libraries:
+- name: webapp2
+  version: latest
+
+handlers:
+- url: /api/v1/games
+  script: api.games.app
