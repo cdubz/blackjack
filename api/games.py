@@ -1,5 +1,6 @@
 import webapp2
 import json
+import datetime
 
 
 from blackjack.engine import *
@@ -7,6 +8,17 @@ from blackjack.models import *
 
 
 class Games(webapp2.RequestHandler):
+    def __init__(self, request=None, response=None):
+        self.initialize(request, response)
+        if request.method in ('GET', 'PATCH'):
+            if 'Bj-Gid' in request.headers.keys():
+                # @todo Figure out how to raise a custom error for bad GID
+                self.game_key = ndb.Key(urlsafe=request.headers['BJ-GID'])
+                self.game = self.game_key.get()
+                self.players = Player.query(ancestor=self.game_key)\
+                    .order(Player.deal_order).fetch()
+            else:
+                raise ValueError('Game ID not provided.')
 
     # Create a new game
     def post(self):
@@ -16,7 +28,7 @@ class Games(webapp2.RequestHandler):
 
         player = Player(
             parent=game_key,
-            name=self.request.get('player_name', 'Anonymoose'),
+            name=self.request.get('player_name', 'Some Jerk'),
             stand=False,
             deal_order=0
         )
@@ -35,24 +47,27 @@ class Games(webapp2.RequestHandler):
         deal(game.deck, dealer)
         ndb.put_multi([game, player, dealer])
 
-        # Return GID only
-        self.response.headers['Content-Type'] = 'application/json'
-        self.response.write(json.dumps({'GID': game_key.urlsafe()}))
+        # Add the new GID to the headers and re-run __init__ to add the
+        # game state objects to self.
+        self.request.headers['Bj-Gid'] = game_key.urlsafe()
+        self.__init__(self.request, self.response)
+        self.get()
 
     # Provide status info for a game
+    # @todo Customize the state return for the requesting player
     def get(self):
-        gid = self.request.headers['BJ-GID']
-        game_key = ndb.Key(urlsafe=gid)
-        game = game_key.get()
-        players = Player.query(ancestor=game_key).order(Player.deal_order).fetch()
-
         state = {
-            'GID': gid,
-            'Started': game.began.isoformat(),
-            'Updated': game.updated.isoformat(),
+            'GID': self.game_key.urlsafe(),
+            'Started': self.game.began.isoformat(),
+            'Updated': self.game.updated.isoformat(),
+            'Ended': None,
             'players': {}
         }
-        for player in players:
+
+        if self.game.ended:
+            state['Ended'] = self.game.ended.isoformat()
+
+        for player in self.players:
             state['players'][player.deal_order] = {
                 'key': player.key.urlsafe(),
                 'name': player.name,
@@ -60,43 +75,46 @@ class Games(webapp2.RequestHandler):
                 'stand': player.stand
             }
 
-        self.response.headers['Content-Type'] = 'application/json'
-        self.response.write(json.dumps(state))
+        self.send_response(state)
 
     # Update game state
     def patch(self):
-        gid = self.request.headers['BJ-GID']
+        if self.game.ended:
+            self.get()
+            return
+
         action = self.request.headers['BJ-Action']
-        game_key = ndb.Key(urlsafe=gid)
-        game = game_key.get()
-        players = Player.query(ancestor=game_key).order(Player.deal_order).fetch()
 
         to_put = []
-        for player_data in players:
+        # @todo Add BUST logic
+        for player_data in self.players:
             if not player_data.stand:
                 player = player_data.key.get()
 
                 if action == 'hit':
-                    deal(game.deck, player)
+                    deal(self.game.deck, player)
                 elif action == 'stand':
                     player.stand = True
+
+                    # If this standing player is the last player, also end
+                    # the game.
+                    if player == self.players[-1]:
+                        self.game.ended = datetime.datetime.today()
                 else:
                     raise ValueError('Invalid action: %s' % action)
 
                 to_put.append(player)
                 break
 
-        if to_put:
-            to_put.append(game)
-            ndb.put_multi(to_put)
-        else:
-            raise StandardError('All players stand. Game is ended.')
+        to_put.append(self.game)
+        ndb.put_multi(to_put)
 
+        self.get()
+
+    # Response controller
+    def send_response(self, content):
         self.response.headers['Content-Type'] = 'application/json'
-        self.response.write(json.dumps({
-            'GID': game_key.urlsafe(),
-            'action': action
-        }))
+        self.response.write(json.dumps(content))
 
 
 # http://stackoverflow.com/questions/16280496/

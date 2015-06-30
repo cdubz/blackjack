@@ -1,10 +1,6 @@
-# Blackjack (gae-web development branch)
+# Blackjack
 
 Blackjack on the Google App Engine with a web-based interface.
-
-There is currently no real end game condition. If all players stand, PATCH 
-calls to the API will raise an error. Otherwise, things will probably break 
-for now.
 
 ## Setup
 The [Google App Engine SDK](https://cloud.google.com/appengine/downloads) is 
@@ -14,20 +10,16 @@ required to run this program.
 
 ## API
 
-The basic API has the following operations:
+The API has the following operations. All operations return a JSON response with basic, non-targeted game state information.
 
 ### POST */api/v1/games*
-With a "player_name" parameter, begins a new game and returns a Game ID in a 
-JSON array in the body.
+Begins a new game with the player identified by a *player_name* parameter if provided.
 
 ### GET */api/v1/games*
-With a BJ-GID header containing a Game ID, returns some basic state information 
-about the game in a JSON array in the body.
+Returns basic state information about the game with ID in the header *Bj-Gid*.
 
 ### PATCH */api/v1/games*
-With a BJ-GID header containing a Game ID and a BJ-Action header containing 
-either "hit" or "stand", updates the game state based the current game state. 
-On success, returns a JSON array containing the BJ-GID and BJ-Action headers.
+With a *Bj-Gid* header identifying the game, the *Bj-Action* header can be either "hit" or "stand". This call will also resolve game end when every player stands (but not on bust).
 
 ## License
 

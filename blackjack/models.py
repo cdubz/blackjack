@@ -21,3 +21,4 @@ class Game(ndb.Model):
     deck = ndb.StructuredProperty(Card, repeated=True)
     began = ndb.DateTimeProperty(auto_now_add=True)
     updated = ndb.DateTimeProperty(auto_now=True)
+    ended = ndb.DateTimeProperty()
